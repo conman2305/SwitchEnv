@@ -1,0 +1,96 @@
+#!/bin/bash
+declare -A ENVIRONMENTS
+ENVIRONMENT=$1
+COMMAND=$2
+
+if [ -z "${ENVIRONMENT}" ]; then
+    echo "ERROR: Environment not provided!"
+    exit 1
+fi
+
+#-------------------------------------------------------------------------------
+function validateConfiguration()
+{
+    local size=${#ENVIRONMENTS[@]}
+    if [ $size -lt 1 ]; then
+        echo "ERROR: \"ENVIRONMENTS\" contains no entries!"
+        exit 1
+    fi
+    
+    size=${#BASEMOUNTS[@]}
+    if [ $size -lt 1 ]; then
+        echo "ERROR: BASEMOUNTS contains no entries!"
+        exit 1
+    fi
+}
+
+
+#-------------------------------------------------------------------------------
+function startEnvironment()
+{
+    local environmentName=$1
+    local dockerImage=$2
+    local containerName="switchenv-${environmentName}-root"
+
+    docker ps | grep "${containerName}" >/dev/null 2>&1
+    local RC=$?
+
+    if [ $RC -ne 0 ]; then
+        echo "Environment \"$environmentName\" not running! Starting container."
+        local mountList=""
+
+        for mountPoint in ${BASEMOUNTS[*]}; do
+            mountList="${mountList} -v ${mountPoint}:${mountPoint} "
+        done
+
+        docker run --restart=always --name "${containerName}" \
+            -h "${containerName}.$(hostname -d)" \
+            ${mountList} -d "${dockerImage}" \
+            /bin/bash -c 'while [ 1 ]; do sleep 1y; done' > /dev/null
+    fi
+    
+    docker exec -it ${containerName} /bin/login -f $(whoami)
+    echo "\$? = $?"
+}
+
+#-------------------------------------------------------------------------------
+function resetEnvironment()
+{
+    local environmentName=$1
+    local containerName="switchenv-${environmentName}-root"
+    docker ps | grep "${containerName}" >/dev/null 2>&1
+    local RC=$?
+
+    if [ $RC -ne 0 ]; then
+        echo "Environment \"$environmentName\" not running! Container will be reset next launch"
+        exit 1
+    fi
+
+    docker rm -f "${containerName}" >/dev/null
+}
+
+    
+
+if [ ! -e ~/.switchenv/switchenv.conf ]; then
+    echo "ERROR: Cannot locatate switchenv configuration file! Should be in ~/.switchenv/switchenv.conf"
+    exit 1
+fi
+
+source ~/.switchenv/switchenv.conf
+validateConfiguration
+
+if [ ! ${ENVIRONMENTS[$ENVIRONMENT]+abc} ]; then
+    echo "ERROR: Environment \"$ENVIRONMENT\" not found!"
+    echo "-> Define \"$ENVIRONMENT\" in ~/.switchenv/switchenv.conf"
+    exit 1
+fi
+
+case $COMMAND in
+"reset")
+    echo "Resetting environment \"$ENVIRONMENT\""
+    resetEnvironment $ENVIRONMENT
+    exit 0
+    ;;
+esac
+
+startEnvironment $ENVIRONMENT ${ENVIRONMENTS[$ENVIRONMENT]}

@@ -1,0 +1,8 @@
+# ENVIRONMENTS - define your environments
+# Example 1: Define a Fedora 28 environment called 'fedora28' that is associated with Docker container tagged as 'fedora:28'
+#   Access this environment by running "switch fedora28"
+# ENVIRONMENTS[fedora28]="fedora:28"
+
+# BASEMOUNTS - Define the base mount points from the underlying server into the Docker containter. The sample list here
+#   should be enough for most people. (Change /home/user to your home directory)
+# BASEMOUNTS=("/etc/passwd" "/etc/shadow" "/home/user" "/etc/group" "/lib/modules" "/dev" "/etc/localtime")
